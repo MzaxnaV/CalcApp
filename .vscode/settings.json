@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "iostream": "cpp",
+        "vector": "cpp",
+        "cassert": "cpp",
+        "*.m": "cpp",
+        "memory": "cpp",
+        "xmemory": "cpp",
+        "xutility": "cpp"
+    }
+}
