@@ -17,7 +17,14 @@ constexpr int GRID_X  = 80;
 constexpr int GRID_Y  = 120;
 constexpr int FONT_SZ = 22;
 
-// Derived vertical positions (col inputs end at GRID_Y + (ROWS+1)*CELL_H = 420)
+// All 8 lap inputs stacked in a column on the right
+// Row sums: x = GRID_X + COLS*CELL_W = 400, w = CELL_W+20 = 100, right edge = 500
+constexpr int LAP_X = GRID_X + COLS * CELL_W + (CELL_W + 20) + 4; // 504
+constexpr int LAP_W = WIN_W - LAP_X - 6;                           // 130
+constexpr int LAP_H = 30;
+constexpr int LAP_GAP = 2; // gap between stacked lap inputs
+
+// Derived vertical positions (col sums end at GRID_Y + (ROWS+1)*CELL_H = 420)
 constexpr int BTN_Y = GRID_Y + (ROWS + 1) * CELL_H + 10; // 430
 constexpr int MSG_Y = BTN_Y + 50;                          // 480
 
@@ -26,6 +33,12 @@ struct Input {
     int  correct_val;
     bool checked;
     bool is_correct;
+};
+
+struct Session {
+    char   date[16];
+    double laps[INPUTS]; // individual lap times; 0 = not entered
+    int    correct;
 };
 
 struct Theme {

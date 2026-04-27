@@ -11,5 +11,6 @@
 #include <cstring>
 #include <ctime>
 #include <cmath>
+#include <vector>
 
 #endif // CALCAPP_PCH_H
