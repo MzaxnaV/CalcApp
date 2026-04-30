@@ -344,6 +344,79 @@ static void draw_line_chart(
         DrawCircle((int)xp(i), (int)yp(series[i]), 3, series_col);
 }
 
+static void draw_lap_dist_chart(Rectangle bounds, const Theme &t) {
+    DrawRectangleRec(bounds, t.surface);
+    DrawRectangleLinesEx(bounds, 0.5f, t.border);
+    DrawText("Lap time distribution — last 5 attempts  \xb7  bar = mean",
+             (int)bounds.x + 6, (int)bounds.y + 5, 11, t.text_mut);
+
+    // collect up to 5 most recent sessions that have lap data
+    std::vector<const Session *> recent;
+    for (int i = (int)sessions.size() - 1; i >= 0 && (int)recent.size() < 5; i--)
+        if (session_total(sessions[i]) > 0.0)
+            recent.push_back(&sessions[i]);
+    std::reverse(recent.begin(), recent.end()); // oldest left
+
+    int n = (int)recent.size();
+    if (n == 0) { draw_centered_text("No data yet", bounds, 13, t.text_mut); return; }
+
+    float lo = 1e9f, hi = 0.0f;
+    for (auto *s : recent)
+        for (int i = 0; i < INPUTS; i++)
+            if (s->laps[i] > 0.0) {
+                lo = std::min(lo, (float)s->laps[i]);
+                hi = std::max(hi, (float)s->laps[i]);
+            }
+    lo = std::max(0.0f, lo * 0.85f);
+    hi = hi * 1.15f;
+    if (hi <= lo) hi = lo + 1.0f;
+
+    const float pad_l = 38.0f, pad_r = 10.0f, pad_t = 22.0f, pad_b = 20.0f;
+    float px = bounds.x + pad_l, py = bounds.y + pad_t;
+    float pw = bounds.width - pad_l - pad_r;
+    float ph = bounds.height - pad_t - pad_b;
+
+    DrawLine((int)px, (int)(py+ph), (int)(px+pw), (int)(py+ph), t.border);
+    DrawLine((int)px, (int)py,      (int)px,       (int)(py+ph), t.border);
+    DrawText(TextFormat("%.0f", hi), (int)(bounds.x + 2), (int)py,          9, t.text_mut);
+    DrawText(TextFormat("%.0f", lo), (int)(bounds.x + 2), (int)(py+ph - 9), 9, t.text_mut);
+
+    auto yp = [&](float v) {
+        float c = v < lo ? lo : (v > hi ? hi : v);
+        return py + ph - (c - lo) / (hi - lo) * ph;
+    };
+
+    const Color session_cols[5] = {
+        { 55,  90, 180, 220 }, { 210, 100,  30, 220 },
+        { 59, 140,  59, 220 }, { 150,  60, 150, 220 },
+        { 170, 150,  20, 220 },
+    };
+
+    float slot_w = pw / (float)(n + 1);
+    for (int si = 0; si < n; si++) {
+        float       cx  = px + (si + 1) * slot_w;
+        const Session *s  = recent[si];
+        Color       col = session_cols[si % 5];
+
+        // date label (mm-dd portion)
+        const char *lbl = strlen(s->date) >= 10 ? s->date + 5 : s->date;
+        DrawText(lbl, (int)(cx - MeasureText(lbl, 8) / 2), (int)(py + ph + 5), 8, t.text_mut);
+
+        float lap_sum = 0.0f; int cnt = 0;
+        for (int i = 0; i < INPUTS; i++) {
+            if (s->laps[i] <= 0.0) continue;
+            float y = yp((float)s->laps[i]);
+            DrawCircle((int)cx, (int)y, 3, col);
+            lap_sum += (float)s->laps[i]; cnt++;
+        }
+        if (cnt > 0) {
+            float my = yp(lap_sum / cnt);
+            DrawLine((int)(cx - 9), (int)my, (int)(cx + 9), (int)my, col);
+            DrawLine((int)(cx - 9), (int)my - 1, (int)(cx + 9), (int)my - 1, col);
+        }
+    }
+}
+
 static void draw_analysis_tab(const Theme &t) {
     std::vector<float> totals, avg_overlay, avg_lap, accs;
     double time_sum = 0.0;
@@ -365,24 +438,27 @@ static void draw_analysis_tab(const Theme &t) {
     char buf[48];
     const int sx = 30;
     snprintf(buf, sizeof(buf), hist_best >= 0.0 ? "Best  %.1fs" : "Best  —", hist_best);
-    DrawText(buf, sx, 84, 11, t.text_pri);
+    DrawText(buf, sx, 68, 11, t.text_pri);
     snprintf(buf, sizeof(buf), hist_avg  >= 0.0 ? "Avg  %.1fs"  : "Avg  —",  hist_avg);
-    DrawText(buf, sx + 120, 84, 11, t.text_pri);
+    DrawText(buf, sx + 120, 68, 11, t.text_pri);
     snprintf(buf, sizeof(buf), "%d sessions", hist_count);
-    DrawText(buf, sx + 240, 84, 11, t.text_pri);
+    DrawText(buf, sx + 240, 68, 11, t.text_pri);
     if (!accs.empty()) {
         float acc_sum = 0;
         for (float a : accs) acc_sum += a;
         snprintf(buf, sizeof(buf), "Avg accuracy  %.0f%%", acc_sum / accs.size());
-        DrawText(buf, sx + 360, 84, 11, t.text_pri);
+        DrawText(buf, sx + 360, 68, 11, t.text_pri);
     }
+
+    constexpr float CX = 30, CW = WIN_W - 60.0f, CH = 138.0f, CGAP = 6.0f;
+    constexpr float CY0 = 84.0f;
 
     // Total time chart (blue = per session, grey = running avg, orange = avg addition time)
     {
         float hi = 60.0f;
         for (float v : totals) if (v * 1.15f > hi) hi = v * 1.15f;
         const Color orange = { 210, 120, 30, 255 };
-        Rectangle r = { 30, 100, WIN_W - 60.0f, 190 };
+        Rectangle r = { CX, CY0, CW, CH };
         draw_line_chart(r, "Total time (s)  \xb7  grey=avg total  \xb7  orange=avg addition time",
                         0.0f, hi,
                         totals, t.active_border,
@@ -390,16 +466,22 @@ static void draw_analysis_tab(const Theme &t) {
                         &avg_lap, orange);
     }
 
-    // Accuracy chart (green = % correct)
+    // Lap time distribution chart
     {
-        Rectangle r = { 30, 302, WIN_W - 60.0f, 190 };
+        Rectangle r = { CX, CY0 + CH + CGAP, CW, CH };
+        draw_lap_dist_chart(r, t);
+    }
+
+    // Accuracy chart
+    {
+        Rectangle r = { CX, CY0 + (CH + CGAP) * 2, CW, CH };
         draw_line_chart(r, "Accuracy (%)",
                         0.0f, 100.0f,
                         accs, t.green,
                         nullptr, {}, t);
     }
 
-    DrawText(TextFormat("Data: %s", sessions_file), 30, WIN_H - 18, 9, t.text_mut);
+    DrawText(TextFormat("Data: %s", sessions_file), 30, WIN_H - 14, 9, t.text_mut);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
