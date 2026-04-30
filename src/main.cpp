@@ -10,6 +10,7 @@ static bool   focus_lap  = false;     // false = sum field, true = lap field
 static bool   done       = false;
 static char   msg[64]    = "";
 static bool   show_analysis = false;
+static bool   all_correct   = false;
 
 static std::vector<Session> sessions;
 static int    hist_count = 0; // all sessions
@@ -231,8 +232,9 @@ void new_table() {
 
     focus     = 0;
     focus_lap = false;
-    done      = false;
-    msg[0]    = '\0';
+    done        = false;
+    all_correct = false;
+    msg[0]      = '\0';
 }
 
 void check_answers() {
@@ -264,7 +266,8 @@ void check_answers() {
     double total = 0.0;
     for (int i = 0; i < INPUTS; i++) total += laps[i];
 
-    if (correct == INPUTS) {
+    all_correct = (correct == INPUTS);
+    if (all_correct) {
         if      (total > 0.0 && total <= 30.0) snprintf(msg, sizeof(msg), "All correct in %.1fs — Excellent!", total);
         else if (total > 0.0 && total <= 60.0) snprintf(msg, sizeof(msg), "All correct in %.1fs — Good.",      total);
         else if (total > 0.0)                  snprintf(msg, sizeof(msg), "All correct in %.1fs — Keep going.", total);
@@ -672,7 +675,7 @@ int main() {
 
             // Message
             if (msg[0]) {
-                Color mc = strstr(msg, "correct") ? t.green : t.red;
+                Color mc = all_correct ? t.green : t.red;
                 DrawText(msg, (WIN_W - MeasureText(msg, 13)) / 2, MSG_Y, 13, mc);
             }
 
